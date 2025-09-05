@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Megaship Movement Tracker - 🍷 Drunken Cpt. Finder V0.1</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        @font-face {
+            font-family: 'EurostileRegular';
+            src: url('fonts/Eurostile-Regular.ttf') format('truetype');
+            font-weight: normal;
+        }
+        @font-face {
+            font-family: 'Eurostile';
+            src: url('fonts/Eurostile-Regular.ttf') format('truetype');
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">
+        <span class="disconnected">● DISCONNECTED</span>
+    </div>
+    
+    <div class="container">
+        <div class="main-view">
+            <h1>MEGASHIP MOVEMENT TRACKER</h1>
+            <h2>Drunken Captain Finder V1.0 👨‍✈</h2>
+            
+            <div class="systems-container">
+                <div class="megaships-section" style="display: flex; gap: 20px; width: 50%;">
+                    <div class="megaship-status" style="flex: 1;">
+                        <div class="megaship-name">CYGNUS</div>
+                        <div class="status-line">
+                            <span class="status-label">Status:</span>
+                            <span class="status-value" id="cygnusStatus">NOT DETECTED</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">System:</span>
+                            <span class="status-value" id="cygnusSystem">Unknown</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">System Address:</span>
+                            <span class="status-value" id="cygnusAddress">N/A</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">Last Seen:</span>
+                            <span class="status-value" id="cygnusTime">Never</span>
+                        </div>
+                    </div>
+                    
+                    <div class="megaship-status" style="flex: 1;">
+                        <div class="megaship-name">THE ORION</div>
+                        <div class="status-line">
+                            <span class="status-label">Status:</span>
+                            <span class="status-value" id="orionStatus">NOT DETECTED</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">System:</span>
+                            <span class="status-value" id="orionSystem">Unknown</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">System Address:</span>
+                            <span class="status-value" id="orionAddress">N/A</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">Last Seen:</span>
+                            <span class="status-value" id="orionTime">Never</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="systems-section">
+                    <div class="system-tracker">
+                        <table class="system-table">
+                            <thead>
+                                <tr>
+                                    <th>System</th>
+                                    <th>CMDRs</th>
+                                    <th>FC</th>
+                                    <th>Cygnus</th>
+                                    <th>Orion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="systemsTable">
+                                <tr>
+                                    <td>Nukamba</td>
+                                    <td id="Nukamba-count">0</td>
+                                    <td id="Nukamba-fc">0</td>
+                                    <td id="Nukamba-Cygnus">-</td>
+                                    <td id="Nukamba-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Graffias</td>
+                                    <td id="Graffias-count">0</td>
+                                    <td id="Graffias-fc">0</td>
+                                    <td id="Graffias-Cygnus">-</td>
+                                    <td id="Graffias-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Vodyakamana</td>
+                                    <td id="Vodyakamana-count">0</td>
+                                    <td id="Vodyakamana-fc">0</td>
+                                    <td id="Vodyakamana-Cygnus">-</td>
+                                    <td id="Vodyakamana-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Marfic</td>
+                                    <td id="Marfic-count">0</td>
+                                    <td id="Marfic-fc">0</td>
+                                    <td id="Marfic-Cygnus">-</td>
+                                    <td id="Marfic-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Upaniklis</td>
+                                    <td id="Upaniklis-count">0</td>
+                                    <td id="Upaniklis-fc">0</td>
+                                    <td id="Upaniklis-Cygnus">-</td>
+                                    <td id="Upaniklis-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>HR 6524</td>
+                                    <td id="HR 6524-count">0</td>
+                                    <td id="HR 6524-fc">0</td>
+                                    <td id="HR 6524-Cygnus">-</td>
+                                    <td id="HR 6524-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Col 359 Sector AE-N b9-4</td>
+                                    <td id="Col 359 Sector AE-N b9-4-count">0</td>
+                                    <td id="Col 359 Sector AE-N b9-4-fc">0</td>
+                                    <td id="Col 359 Sector AE-N b9-4-Cygnus">-</td>
+                                    <td id="Col 359 Sector AE-N b9-4-Orion">-</td>
+                                </tr>
+                                <tr>
+                                    <td>HIP 87621</td>
+                                    <td id="HIP 87621-count">0</td>
+                                    <td id="HIP 87621-fc">0</td>
+                                    <td id="HIP 87621-Cygnus">-</td>
+                                    <td id="HIP 87621-Orion">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-legend" style="margin-top: 20px; width: 100%;">
+                <div style="font-size: 0.9em; line-height: 1.6; margin-bottom: 15px;">
+                    <div><h4 style="color: #aa5d00; display: inline;">STATUS LEGEND: </h4><span style="color: #00FF00;">DETECTED:</span> FSS Signal was detected &nbsp; | &nbsp; <span style="color: #ffd500;">SIGNAL MISSING:</span> System visit without detected signal
+                    <span style="color: #aa5d00;">&nbsp; | &nbsp; NOT DETECTED:</span> Unknown status, no messages detected</div>
+                </div>
+            </div>      
+
+            <div class="map-container" style="width: 70%;">
+                <div id="megaship-svg-container" style="width: 100%; background: rgba(255, 140, 0, 0.02); padding: 0;">
+                    <!-- SVG will be loaded here -->
+                </div>
+            </div>
+
+        </div>
+        
+        <div class="event-log">
+            <h3>ACTIVITY LOG</h3>
+            <div id="eventList">
+                <div class="no-data">Waiting for activity...</div>
+            </div>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #FF8C00; opacity: 0.7; font-size: 0.85em;">
+                <div>Stats:</div>
+                <div id="stats">Messages: 0 | Signals: 0 | FCs: 0</div>
+            </div>
+        </div>
+        
+
+    </div>
+    
+    <script src="js/megaship_map.js"></script>
+    <script src="js/events.js"></script>
+</body>
+</html>
