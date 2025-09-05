@@ -37,16 +37,17 @@ class MegashipTracker:
         # Create EDDN listener
         self.listener = EDDNListener()
         
-        # Create web server
-        self.server = WebServer(listener=self.listener, port=8042)
+        # Create web server - use 8000 for server, 8042 for local
+        port = 8000 if is_server else 8042
+        self.server = WebServer(listener=self.listener, port=port)
         self.server.set_listener(self.listener)
         
         # Start web server
         await self.server.start()
         if is_server:
-            logger.info("Web interface available on port 8042 (all interfaces)")
+            logger.info(f"Web interface available on port {port} (all interfaces)")
         else:
-            logger.info("Web interface available at: http://localhost:8042")
+            logger.info(f"Web interface available at: http://localhost:{port}")
         
         # Start EDDN listener
         logger.info("Starting EDDN listener...")

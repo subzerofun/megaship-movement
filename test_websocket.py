@@ -83,4 +83,4 @@ async def main():
         await test_websocket(endpoint)
 
 if __name__ == "__main__":
-    asyncio.run(main()
+    asyncio.run(main())
