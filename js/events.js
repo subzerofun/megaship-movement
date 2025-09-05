@@ -31,6 +31,8 @@ function updateMegashipStatus(name, data) {
         
         if (status === 'DETECTED') {
             statusElem.style.color = '#00FF00';
+        } else if (status === 'IRREGULAR VISIT') {
+            statusElem.style.color = '#FF0000';  // Red for irregular visit
         } else if (status === 'SIGNAL MISSING' || status === 'MISSING') {
             statusElem.textContent = 'SIGNAL MISSING';
             statusElem.style.color = '#FFD700';
@@ -62,16 +64,32 @@ function addEventToLog(event) {
     
     if (event.type === 'megaship') {
         eventDiv.className += ' megaship';
-        const statusIcon = event.status === 'DETECTED' ? '🟢' : event.status === 'MISSING' ? '⚠️' : '❓';
-        eventDiv.innerHTML = `
-            <strong>${statusIcon} ${event.name} ${event.status}</strong><br>
-            System: ${event.system} (${event.system_address})<br>
-            Signal Type: ${event.signal_type || 'Unknown'}
-            <div class="event-time">${formatTime(event.timestamp)}</div>
-        `;
+        
+        // Check for irregular visit
+        if (event.is_irregular || event.status === 'IRREGULAR VISIT') {
+            eventDiv.className += ' irregular';
+            eventDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
+            eventDiv.style.borderLeft = '4px solid #FF0000';
+            const statusIcon = '🚨';
+            eventDiv.innerHTML = `
+                <strong style="color: #FF0000;">${statusIcon} IRREGULAR VISIT: ${event.name}</strong><br>
+                <span style="color: #FF0000;">NON-TRACKED SYSTEM: ${event.system}</span><br>
+                System Address: ${event.system_address}<br>
+                Signal Type: ${event.signal_type || 'Unknown'}
+                <div class="event-time">${formatTime(event.timestamp)}</div>
+            `;
+        } else {
+            const statusIcon = event.status === 'DETECTED' ? '🟢' : event.status === 'SIGNAL MISSING' ? '⚠️' : '❓';
+            eventDiv.innerHTML = `
+                <strong>${statusIcon} ${event.name} ${event.status}</strong><br>
+                System: ${event.system} (${event.system_address})<br>
+                Signal Type: ${event.signal_type || 'Unknown'}
+                <div class="event-time">${formatTime(event.timestamp)}</div>
+            `;
+        }
     } else if (event.type === 'system_traffic') {
         eventDiv.className += ' system';
-        const icon = event.action === 'entered' ? '📥' : '📤';
+        const icon = event.action === 'entered' ? '↪' : '↩';
         eventDiv.innerHTML = `
             <strong>${icon} ${event.system}</strong><br>
             Commander ${event.action} (now ${event.commander_count} cmdrs)

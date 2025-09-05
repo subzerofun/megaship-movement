@@ -36,9 +36,10 @@ class EDDNListener:
             "HIP 87621": {"address": 147882789259, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"}
         }
         self.cmdr_tracker = CommanderTracker()  # Use the new commander tracker
-        self.recent_events = deque(maxlen=50)
+        self.recent_events = deque(maxlen=300)  # Keep last 300 events
         self.running = False
         self.messages_received = 0
+        self.missing_confirmations = {}  # Track missing signal confirmations per ship/system
         self.messages_processed = 0
         self.signals_checked = 0
         self.fleet_carriers_seen = 0
@@ -170,19 +171,29 @@ class EDDNListener:
                 logger.info(f"   Signal Type: {signal_type}")
                 logger.info(f"   Timestamp: {signal_timestamp}")
                 
-                # Update megaship status to DETECTED
+                # Check if this is an irregular visit (not in tracked systems)
+                is_irregular = system not in self.tracked_systems
+                
+                # Update megaship status to DETECTED or IRREGULAR VISIT
                 self.megaships[signal_name] = {
                     "last_seen": signal_timestamp,
                     "system": system,
                     "system_address": system_address,
                     "signal_type": signal_type,
-                    "status": "DETECTED"
+                    "status": "IRREGULAR VISIT" if is_irregular else "DETECTED"
                 }
+                
+                if is_irregular:
+                    logger.warning(f"🚨 IRREGULAR VISIT: {signal_name} detected in non-tracked system {system}!")
                 
                 # Update tracked system if applicable - store the timestamp as proof of detection
                 if system in self.tracked_systems:
                     self.tracked_systems[system][signal_name] = signal_timestamp
                     logger.debug(f"Stored detection timestamp for {signal_name} in {system}: {signal_timestamp}")
+                    # Reset missing confirmations when detected
+                    key = f"{signal_name}_{system}"
+                    if key in self.missing_confirmations:
+                        del self.missing_confirmations[key]
                 
                 # Create event
                 event_data = {
@@ -191,8 +202,9 @@ class EDDNListener:
                     "system": system,
                     "system_address": system_address,
                     "signal_type": signal_type,
-                    "status": "DETECTED",
-                    "timestamp": signal_timestamp
+                    "status": "IRREGULAR VISIT" if is_irregular else "DETECTED",
+                    "timestamp": signal_timestamp,
+                    "is_irregular": is_irregular
                 }
                 await self.handle_event(event_data)
         
@@ -206,20 +218,32 @@ class EDDNListener:
                     # Only mark as MISSING if it was previously DETECTED in THIS system
                     # Check both the tracked system status and that it's a timestamp (meaning it was detected)
                     if (isinstance(current_status_in_system, str) and 
-                        current_status_in_system not in ["NOT DETECTED", "MISSING"] and 
+                        current_status_in_system not in ["NOT DETECTED", "SIGNAL MISSING"] and 
                         "T" in current_status_in_system):  # It's a timestamp, meaning it was detected
                         
-                        logger.info(f"⚠️ MEGASHIP SIGNAL MISSING: {megaship_name} was previously in {system} but not found now")
-                        logger.info(f"   Previous detection: {current_status_in_system}")
-                        logger.info(f"   Current scan: {len(signals)} signals, none matching {megaship_name}")
+                        # Track missing confirmations
+                        key = f"{megaship_name}_{system}"
+                        if key not in self.missing_confirmations:
+                            self.missing_confirmations[key] = 0
                         
-                        # Update status to MISSING
-                        self.megaships[megaship_name]["status"] = "MISSING"
-                        self.megaships[megaship_name]["last_checked"] = timestamp
-                        self.megaships[megaship_name]["previous_detection"] = current_status_in_system
+                        self.missing_confirmations[key] += 1
                         
-                        # Update tracked system
-                        self.tracked_systems[system][megaship_name] = "MISSING"
+                        # Only mark as SIGNAL MISSING after 5 confirmations
+                        if self.missing_confirmations[key] >= 5:
+                            logger.info(f"⚠️ MEGASHIP SIGNAL MISSING: {megaship_name} confirmed missing in {system} after {self.missing_confirmations[key]} scans")
+                            logger.info(f"   Previous detection: {current_status_in_system}")
+                            logger.info(f"   Current scan: {len(signals)} signals, none matching {megaship_name}")
+                            
+                            # Update status to SIGNAL MISSING
+                            self.megaships[megaship_name]["status"] = "SIGNAL MISSING"
+                            self.megaships[megaship_name]["last_checked"] = timestamp
+                            self.megaships[megaship_name]["previous_detection"] = current_status_in_system
+                            
+                            # Update tracked system
+                            self.tracked_systems[system][megaship_name] = "SIGNAL MISSING"
+                        else:
+                            logger.debug(f"Missing confirmation #{self.missing_confirmations[key]} for {megaship_name} in {system}")
+                            # Keep showing last detected time until 5 confirmations
                         
                         # Create event
                         event_data = {
@@ -227,7 +251,7 @@ class EDDNListener:
                             "name": megaship_name,
                             "system": system,
                             "system_address": system_address,
-                            "status": "MISSING",
+                            "status": "SIGNAL MISSING",
                             "timestamp": timestamp,
                             "previous_detection": current_status_in_system
                         }

@@ -71,10 +71,18 @@ async def test_websocket(uri):
 
 async def main():
     # Test both local and remote endpoints
-    endpoints = [
-        "ws://localhost:8042/ws",
-        # "wss://yourserver.com/ws",  # Update with your server
-    ]
+    import os
+    is_server = os.environ.get('SERVER', '').upper() == 'TRUE'
+    
+    if is_server:
+        endpoints = [
+            "ws://localhost:8000/ws",  # Inside container
+            "ws://megaship_web:8000/ws",  # Container name
+        ]
+    else:
+        endpoints = [
+            "ws://localhost:8042/ws",  # Local development
+        ]
     
     for endpoint in endpoints:
         logger.info(f"\n{'='*50}")

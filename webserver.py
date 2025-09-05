@@ -39,6 +39,7 @@ class WebServer:
         self.app.router.add_get('/', self.index_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_get('/status', self.status_handler)
+        self.app.router.add_get('/favicon.ico', self.favicon_handler)
         
         # Setup CSS directory
         css_dir = Path(__file__).parent / 'css'
@@ -89,6 +90,14 @@ class WebServer:
             return web.json_response(status)
         else:
             return web.json_response({"error": "Listener not available"})
+    
+    async def favicon_handler(self, request):
+        """Serve favicon"""
+        favicon_path = Path(__file__).parent / 'favicon.ico'
+        if favicon_path.exists():
+            return web.FileResponse(favicon_path)
+        else:
+            return web.Response(status=404)
             
     async def websocket_handler(self, request):
         """Handle WebSocket connections"""
