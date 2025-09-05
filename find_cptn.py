@@ -7,9 +7,13 @@ Launches EDDN listener and web server for tracking Cygnus and The Orion
 import asyncio
 import signal
 import sys
+import os
 import logging
 from eddn_listener import EDDNListener
 from webserver import WebServer
+
+# Check if running on server
+is_server = os.environ.get('SERVER', '').upper() == 'TRUE'
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +43,10 @@ class MegashipTracker:
         
         # Start web server
         await self.server.start()
-        logger.info("Web interface available at: http://localhost:8042")
+        if is_server:
+            logger.info("Web interface available on port 8042 (all interfaces)")
+        else:
+            logger.info("Web interface available at: http://localhost:8042")
         
         # Start EDDN listener
         logger.info("Starting EDDN listener...")

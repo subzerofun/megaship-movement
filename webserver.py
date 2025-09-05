@@ -16,13 +16,23 @@ logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(name)s %(leveln
 logger = logging.getLogger('webserver')
 
 class WebServer:
-    def __init__(self, listener=None, host='0.0.0.0', port=8080):
+    def __init__(self, listener=None, host=None, port=8080):
         self.listener = listener
-        self.host = host
+        # Check if running on server or locally
+        self.is_server = os.environ.get('SERVER', '').upper() == 'TRUE'
+        
+        # Set host based on environment
+        if host:
+            self.host = host
+        else:
+            self.host = '0.0.0.0' if self.is_server else 'localhost'
+            
         self.port = port
         self.websockets = set()
         self.app = web.Application()
         self.setup_routes()
+        
+        logger.info(f"Server mode: {self.is_server} (host: {self.host})")
         
     def setup_routes(self):
         """Setup web routes"""
@@ -150,7 +160,10 @@ class WebServer:
         site = web.TCPSite(runner, self.host, self.port)
         await site.start()
         logger.info(f"✓ Web server started at http://{self.host}:{self.port}")
-        logger.info(f"Open your browser to: http://localhost:{self.port}")
+        if self.is_server:
+            logger.info(f"Server mode: Listening on all interfaces (0.0.0.0:{self.port})")
+        else:
+            logger.info(f"Local mode: Open your browser to: http://localhost:{self.port}")
         
     def set_listener(self, listener):
         """Set EDDN listener reference"""
