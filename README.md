@@ -1,4 +1,7 @@
-# Megaship Movement Tracker - Drunken Cpt. Finder
+# Megaship Movement Tracker 
+### Drunken Captain Finder
+
+<img src="img/icon_1.svg" alt="Icon" width="64" height="64">
 
 Real-time tracker for Elite Dangerous megaships "Cygnus" and "The Orion" using EDDN data.
 
@@ -17,6 +20,8 @@ python find_cptn.py
 Then open http://localhost:8042 in your browser.
 
 ## Features
+
+
 
 - Monitors EDDN for FSSSignalDiscovered events
 - Tracks current commander location via FSDJump/Location events  
