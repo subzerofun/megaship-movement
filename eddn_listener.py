@@ -9,6 +9,7 @@ import zlib
 import json
 import asyncio
 import threading
+import os
 from datetime import datetime, timezone
 from collections import deque
 import logging
@@ -16,6 +17,9 @@ from utils.cmdr_tracker import CommanderTracker
 
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(name)s %(levelname)s: %(message)s')
 logger = logging.getLogger('eddn_listener')
+
+# Configuration constants
+MISSING_COUNT_FOR_JUMP = 6  # After this many missing signals, ship has jumped
 
 class EDDNListener:
     def __init__(self, callback=None):
@@ -43,6 +47,7 @@ class EDDNListener:
         self.messages_processed = 0
         self.signals_checked = 0
         self.fleet_carriers_seen = 0
+        self.previous_ship_systems = {}  # Track where ships were last seen for jump detection
         
     def zmq_listener_thread(self):
         """ZMQ listener in separate thread"""
@@ -195,6 +200,19 @@ class EDDNListener:
                     if key in self.missing_confirmations:
                         del self.missing_confirmations[key]
                 
+                # Check if ship appeared in a different system (jump detected)
+                    previous_system = self.previous_ship_systems.get(signal_name)
+                    if previous_system and previous_system != system:
+                        # Ship jumped to a new system - send notification
+                        try:
+                            from utils.push_notifications import send_ship_appeared
+                            asyncio.create_task(send_ship_appeared(signal_name, system, signal_timestamp))
+                        except Exception as e:
+                            logger.debug(f"Push notification skipped: {e}")
+                    
+                    # Update last known system
+                    self.previous_ship_systems[signal_name] = system
+                
                 # Create event
                 event_data = {
                     "type": "megaship",
@@ -228,7 +246,7 @@ class EDDNListener:
                         
                         self.missing_confirmations[key] += 1
                         
-                        # Only mark as SIGNAL MISSING after 5 confirmations
+                        # Only mark as SIGNAL MISSING after configured confirmations
                         if self.missing_confirmations[key] >= 5:
                             logger.info(f"⚠️ MEGASHIP SIGNAL MISSING: {megaship_name} confirmed missing in {system} after {self.missing_confirmations[key]} scans")
                             logger.info(f"   Previous detection: {current_status_in_system}")
@@ -241,6 +259,16 @@ class EDDNListener:
                             
                             # Update tracked system
                             self.tracked_systems[system][megaship_name] = "SIGNAL MISSING"
+                            
+                            # Check if this is the jump threshold - send notification
+                            if self.missing_confirmations[key] == MISSING_COUNT_FOR_JUMP:
+                                try:
+                                    from utils.push_notifications import send_ship_jumped
+                                    asyncio.create_task(send_ship_jumped(megaship_name, system, timestamp))
+                                    # Update last known system for jump detection
+                                    self.previous_ship_systems[megaship_name] = system
+                                except Exception as e:
+                                    logger.debug(f"Push notification skipped: {e}")
                             
                             # Create event ONLY after 5 confirmations
                             event_data = {

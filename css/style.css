@@ -241,3 +241,115 @@ h2 {
 ::-webkit-scrollbar-thumb {
     background: #FF8C00;
 }
+
+/* Subscribe Button Styles */
+.subscribe-button {
+    height: 40px;
+    padding: 0 20px;
+    background: #FF8C00;
+    border: none;
+    color: #000000;
+    cursor: pointer;
+    font-family: 'Eurostile', sans-serif;
+    font-weight: bold;
+    display: none;
+    transition: all 0.3s;
+    align-items: center;
+}
+
+.subscribe-button:hover {
+    background: #FFD700 !important;
+    color: #000000 !important;
+}
+
+.subscribe-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Custom Checkbox Styles */
+.custom-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.custom-checkbox .checkbox-box {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    border: 1px solid #444;
+    position: relative;
+    transition: all 0.3s;
+    background: linear-gradient(135deg, #000000 0%, #4A2C17 100%);
+}
+
+.custom-checkbox input:checked + .checkbox-box {
+    background: linear-gradient(135deg, #00BFFF 0%, #00FFFF 100%);
+    border-color: #00FFFF;
+}
+
+/* Test Panel Styles */
+.test-panel {
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #FF8C00;
+    padding: 15px;
+}
+
+.test-panel h3 {
+    color: #FF8C00;
+    margin: 0 0 15px 0;
+    font-size: 1.2em;
+    border-bottom: 1px solid #FF8C00;
+    padding-bottom: 5px;
+}
+
+.test-panel h4 {
+    color: #FFA500;
+    margin: 10px 0 5px 0;
+    font-size: 0.9em;
+}
+
+.test-section {
+    margin-bottom: 20px;
+    padding: 10px;
+    background: rgba(255, 140, 0, 0.05);
+    border: 1px solid rgba(255, 140, 0, 0.3);
+}
+
+.test-panel button {
+    background: rgba(255, 140, 0, 0.3);
+    border: 1px solid #FF8C00;
+    color: #FFA500;
+    padding: 5px 10px;
+    cursor: pointer;
+    margin: 2px;
+    font-family: 'Chakra Petch', monospace;
+    font-size: 0.85em;
+}
+
+.test-panel button:hover {
+    background: rgba(255, 140, 0, 0.5);
+    color: #FFFF00;
+}
+
+.test-panel select {
+    background: #000;
+    border: 1px solid #FF8C00;
+    color: #FFA500;
+    padding: 3px;
+    margin: 2px;
+    font-family: 'Chakra Petch', monospace;
+    font-size: 0.85em;
+}
+
+/* EKG Display Styles */
+.ekg-display {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    font-size: 1.1em;
+    display: inline-block;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 2px 5px;
+    border: 1px solid rgba(255, 140, 0, 0.3);
+}

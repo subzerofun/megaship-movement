@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Megaship Movement Tracker - 🍷 Drunken Cpt. Finder V0.1</title>
+    <title>Megaship Movement Tracker - 🍷 Drunken Cpt. Finder V1.2</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
         @font-face {
@@ -26,7 +26,24 @@
     <div class="container">
         <div class="main-view">
             <h1><span class="logo"><img src="img/icon_1.svg" width="32" height="32"></span>MEGASHIP MOVEMENT TRACKER</h1>
-            <h2>Drunken Captain Finder V1.1</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;">Drunken Captain Finder V1.2  <i style="font-weight:300;">* now with Push Notifications</i></h2>
+                <button id="subscribeBtn" class="subscribe-button">
+                    <span>🔔 SUBSCRIBE</span>
+                    <span style="margin-left: 20px; display: flex; align-items: center;">
+                        <label class="custom-checkbox" style="margin-right: 15px;">
+                            <input type="checkbox" id="shipsJumping" checked style="display: none;">
+                            <span class="checkbox-box"></span>
+                            <span style="margin-left: 8px; color: #000;">Jumps</span>
+                        </label>
+                        <label class="custom-checkbox">
+                            <input type="checkbox" id="shipsAppearing" checked style="display: none;">
+                            <span class="checkbox-box"></span>
+                            <span style="margin-left: 8px; color: #000;">Re-Entries</span>
+                        </label>
+                    </span>
+                </button>
+            </div>
             
             <div class="systems-container">
                 <div class="megaships-section" style="display: flex; gap: 20px; width: 50%;">
@@ -48,6 +65,12 @@
                             <span class="status-label">Last Seen:</span>
                             <span class="status-value" id="cygnusTime">Never</span>
                         </div>
+                        <div class="status-line">
+                            <span class="status-label">Signals:</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="ekg-display" id="cygnus-ekg" style="font-family: monospace; letter-spacing: 1px; display: block; text-align: center; width: 100%;">░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>
+                        </div>
                     </div>
                     
                     <div class="megaship-status" style="flex: 1;">
@@ -67,6 +90,12 @@
                         <div class="status-line">
                             <span class="status-label">Last Seen:</span>
                             <span class="status-value" id="orionTime">Never</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="status-label">Signals:</span>
+                        </div>
+                        <div class="status-line">
+                            <span class="ekg-display" id="orion-ekg" style="font-family: monospace; letter-spacing: 1px; display: block; text-align: center; width: 100%;">░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>
                         </div>
                     </div>
                 </div>
@@ -153,10 +182,13 @@
                 </div>
             </div>      
 
-            <div class="map-container" style="width: 70%;">
-                <div id="megaship-svg-container" style="width: 100%; max-height: 500px; background: rgba(255, 140, 0, 0.02); padding: 0;">
-                    <!-- SVG will be loaded here -->
+            <div style="display: flex; gap: 20px; width: 100%;">
+                <div class="map-container" style="width: 70%;">
+                    <div id="megaship-svg-container" style="width: 100%; max-height: 500px; background: rgba(255, 140, 0, 0.02); padding: 0;">
+                        <!-- SVG will be loaded here -->
+                    </div>
                 </div>
+                <!-- Test panel will be inserted here by JavaScript -->
             </div>
 
         </div>
@@ -177,5 +209,8 @@
     
     <script src="js/megaship_map.js"></script>
     <script src="js/events.js"></script>
+    <script src="js/push-notifications.js"></script>
+    
+    <script src="js/test.js"></script>
 </body>
 </html>

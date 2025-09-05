@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# VAPID keys - NEVER commit these!
+private_key.pem
+public_key.pem
+*.pem
+vapid_keys.txt
+generate_vapid_keys_output.txt
+private_key_b64.txt
+public_key_b64.txt
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+megaship-map.ai
+img/icon.psd
+megaship-map.ai
+convert_vapid_key.py
+*.pyc

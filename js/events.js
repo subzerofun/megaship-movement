@@ -6,6 +6,48 @@
 let ws = null;
 let reconnectTimer = null;
 
+// Track missing signal counts for each ship/system combination
+const missingSignalCounts = {
+    'Cygnus': {},
+    'The Orion': {}
+};
+
+// Track previous system for each ship (to detect system changes)
+const previousShipSystems = {
+    'Cygnus': null,
+    'The Orion': null
+};
+
+// Track when ship went missing (for detecting long absences)
+const shipMissingTimestamps = {
+    'Cygnus': null,
+    'The Orion': null
+};
+
+// Track EKG history for each ship
+const shipEKG = {
+    'Cygnus': [],
+    'The Orion': []
+};
+
+// EKG Configuration
+const EKG_SYMBOLS = {
+    DETECTED: '▓',           // Green - signal detected
+    MISSING_1_2: '░',        // Light - 1st and 2nd missing
+    MISSING_3_4: '▒',        // Medium - 3rd and 4th missing  
+    MISSING_5_6: '▓',        // Heavy - 5th and 6th missing
+    GONE: '▓',               // Red - ship gone (after 6)
+    FILLER: '░'              // Dark orange - empty space filler
+};
+
+const EKG_COLORS = {
+    DETECTED: '#00FF00',      // Green
+    MISSING_EARLY: '#FFA500',  // Orange
+    MISSING_LATE: '#FFD700',   // Gold/Yellow
+    GONE: '#FF0000',          // Red
+    FILLER: '#AA5500'         // Dark orange
+};
+
 function formatTime(timestamp) {
     if (!timestamp) return 'Never';
     const date = new Date(timestamp);
@@ -29,13 +71,29 @@ function updateMegashipStatus(name, data) {
     if (statusElem) {
         statusElem.textContent = status;
         
+        // Update EKG display based on status
+        if (window.addToEKG) {
+            if (status === 'DETECTED') {
+                window.addToEKG(name, 'detected', 0);
+            } else if (status === 'SIGNAL MISSING') {
+                // Use missing count if available
+                const missingCount = data.missing_count || 1;
+                window.addToEKG(name, 'missing', missingCount);
+            } else if (status === 'MISSING') {
+                window.addToEKG(name, 'gone', 7);
+            }
+        }
+        
         if (status === 'DETECTED') {
             statusElem.style.color = '#00FF00';
         } else if (status === 'IRREGULAR VISIT') {
             statusElem.style.color = '#FF0000';  // Red for irregular visit
-        } else if (status === 'SIGNAL MISSING' || status === 'MISSING') {
+        } else if (status === 'MISSING') {
+            statusElem.textContent = 'MISSING';
+            statusElem.style.color = '#FF0000';  // Red for ship has jumped
+        } else if (status === 'SIGNAL MISSING') {
             statusElem.textContent = 'SIGNAL MISSING';
-            statusElem.style.color = '#FFD700';
+            statusElem.style.color = '#FFD700';  // Yellow for checking
         } else {
             statusElem.style.color = '#FF8C00';
         }
@@ -239,19 +297,87 @@ function connectWebSocket() {
                 
                 // Process different event types
                 if (eventData.type === 'megaship') {
+                    // Track missing signal counts
+                    const shipName = eventData.name;
+                    const system = eventData.system;
+                    const key = `${shipName}_${system}`;
+                    
+                    if (eventData.status === 'SIGNAL MISSING') {
+                        // Increment missing count for this ship/system
+                        if (!missingSignalCounts[shipName][key]) {
+                            missingSignalCounts[shipName][key] = 0;
+                        }
+                        missingSignalCounts[shipName][key]++;
+                        
+                        console.log(`⚠️ ${shipName} SIGNAL MISSING in ${system} (count: ${missingSignalCounts[shipName][key]})`);
+                        
+                        // After 6 missing signals, the ship has jumped!
+                        if (missingSignalCounts[shipName][key] >= 6) {
+                            // Change status to MISSING (ship has jumped)
+                            eventData.status = 'MISSING';
+                            
+                            // Send push notification only on the 6th signal
+                            if (missingSignalCounts[shipName][key] === 6) {
+                                console.log(`🚨 ${shipName} is now MISSING from ${system}! Ship has jumped!`);
+                                // THIS IS THE REAL PUSH NOTIFICATION - same for test and production!
+                                sendPushNotification('jumped', shipName, system);
+                                
+                                // Record when the ship went missing
+                                shipMissingTimestamps[shipName] = Date.now();
+                            }
+                        }
+                    } else if (eventData.status === 'DETECTED') {
+                        // Reset count when detected - this is the ONLY way to reset from MISSING
+                        missingSignalCounts[shipName][key] = 0;
+                        
+                        // Check if ship was MISSING for over 10 minutes (even in same system)
+                        const wasLongMissing = shipMissingTimestamps[shipName] && 
+                                              (Date.now() - shipMissingTimestamps[shipName]) > (10 * 60 * 1000); // 10 minutes
+                        
+                        const previousSystem = previousShipSystems[shipName];
+                        
+                        // ALWAYS log detection
+                        console.log(`✅ ${shipName} DETECTED in ${system}`);
+                        
+                        // Send notification if:
+                        // 1. Ship appeared in a different system, OR
+                        // 2. Ship was MISSING for over 10 minutes (could have jumped away and back)
+                        if (previousSystem && previousSystem !== system) {
+                            console.log(`🔄 SYSTEM CHANGE: ${shipName} moved from ${previousSystem} to ${system}!`);
+                            sendPushNotification('appeared', shipName, system, previousSystem);
+                            
+                            // Clear old system display in table
+                            const oldSystemElem = document.getElementById(previousSystem + '-' + shipNameShort);
+                            if (oldSystemElem) {
+                                oldSystemElem.textContent = '-';
+                                oldSystemElem.style.color = '#FF8C00'; // Orange for old
+                            }
+                        } else if (previousSystem === system && wasLongMissing) {
+                            console.log(`🔄 REAPPEARED: ${shipName} back in ${system} after being MISSING for over 10 minutes!`);
+                            sendPushNotification('appeared', shipName, system, previousSystem);
+                        }
+                        
+                        // Clear missing timestamp since ship is detected
+                        shipMissingTimestamps[shipName] = null;
+                        
+                        // Update last known system
+                        previousShipSystems[shipName] = system;
+                    }
+                    
                     const megashipData = {
                         last_seen: eventData.timestamp,
                         system: eventData.system,
                         system_address: eventData.system_address,
                         signal_type: eventData.signal_type,
-                        status: eventData.status
+                        status: eventData.status,
+                        missing_count: missingSignalCounts[shipName][key] || 0
                     };
                     updateMegashipStatus(eventData.name, megashipData);
                     
                     // Update system table immediately
                     const systemName = eventData.system;
-                    const shipName = eventData.name.replace('The ', '');
-                    const systemElem = document.getElementById(systemName + '-' + shipName);
+                    const shipNameShort = eventData.name.replace('The ', '');
+                    const systemElem = document.getElementById(systemName + '-' + shipNameShort);
                     if (systemElem) {
                         if (eventData.status === 'DETECTED') {
                             const date = new Date(eventData.timestamp);
@@ -259,14 +385,21 @@ function connectWebSocket() {
                             systemElem.style.color = '#00FF00';
                             // Update map
                             if (window.updateMegashipMap) {
-                                window.updateMegashipMap(shipName.includes('Orion') ? 'The Orion' : shipName, systemName, true);
+                                window.updateMegashipMap(shipNameShort.includes('Orion') ? 'The Orion' : shipNameShort, systemName, true);
                             }
-                        } else if (eventData.status === 'MISSING' || eventData.status === 'SIGNAL MISSING') {
-                            systemElem.textContent = 'SIGNAL MISSING';
-                            systemElem.style.color = '#FFD700';
+                        } else if (eventData.status === 'MISSING') {
+                            systemElem.textContent = 'MISSING';
+                            systemElem.style.color = '#FF0000';  // Red for jumped
                             // Update map
                             if (window.updateMegashipMap) {
-                                window.updateMegashipMap(shipName.includes('Orion') ? 'The Orion' : shipName, systemName, false);
+                                window.updateMegashipMap(shipNameShort.includes('Orion') ? 'The Orion' : shipNameShort, systemName, false);
+                            }
+                        } else if (eventData.status === 'SIGNAL MISSING') {
+                            systemElem.textContent = 'SIGNAL MISSING';
+                            systemElem.style.color = '#FFD700';  // Yellow for checking
+                            // Update map
+                            if (window.updateMegashipMap) {
+                                window.updateMegashipMap(shipNameShort.includes('Orion') ? 'The Orion' : shipNameShort, systemName, false);
                             }
                         }
                     }
@@ -305,6 +438,11 @@ function connectWebSocket() {
 // Connect on page load
 connectWebSocket();
 
+// Don't automatically request notification permission - wait for user action
+
+// Make ws available globally for test panel
+window.ws = ws;
+
 // Load SVG map after page is ready
 setTimeout(() => {
     if (window.loadMegashipMap) {
@@ -321,3 +459,139 @@ setInterval(() => {
         ws.send(JSON.stringify({type: 'ping'}));
     }
 }, 30000);
+
+/**
+ * THE ONE FUNCTION that handles ALL notifications - browser AND push triggers
+ * Used by BOTH test and production events
+ */
+function sendPushNotification(type, shipName, system, previousSystem = null) {
+    let title, body;
+    
+    if (type === 'jumped') {
+        title = `${shipName} has jumped!`;
+        body = `${shipName} has left ${system} after 6 consecutive missing signals`;
+        console.log(`🚀 NOTIFICATION: ${title}`);
+    } else if (type === 'appeared') {
+        title = `${shipName} appeared in ${system}!`;
+        body = `${shipName} has been detected in ${system}${previousSystem ? ` (previously in ${previousSystem})` : ''}`;
+        console.log(`🎯 NOTIFICATION: ${title}`);
+    }
+    
+    console.log(`   Body: ${body}`);
+    
+    // SEND BOTH:
+    
+    // 1. Browser notification for immediate local display
+    if (window.Notification && Notification.permission === 'granted') {
+        new Notification(title, {
+            body: body,
+            icon: '/img/icon_1.svg',
+            tag: type === 'jumped' ? 'ship-jumped' : 'ship-appeared'
+        });
+    }
+    
+    // 2. ACTUALLY SEND PUSH via WebSocket to server (which will use pywebpush)
+    if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+        window.ws.send(JSON.stringify({
+            type: 'send_push',
+            notification: {
+                title: title,
+                body: body,
+                ship: shipName,
+                system: system,
+                event_type: type
+            }
+        }));
+        console.log(`   Push message sent to server for distribution`);
+    }
+}
+
+// Export for any other code that needs it
+window.sendPushNotification = sendPushNotification;
+
+/**
+ * Add signal to EKG history
+ */
+function addToEKG(shipName, type, missingCount) {
+    const timestamp = Date.now();
+    let symbol, color;
+    
+    if (type === 'detected') {
+        symbol = EKG_SYMBOLS.DETECTED;
+        color = EKG_COLORS.DETECTED;
+    } else if (type === 'missing') {
+        if (missingCount <= 2) {
+            symbol = EKG_SYMBOLS.MISSING_1_2;
+            color = EKG_COLORS.MISSING_EARLY;
+        } else if (missingCount <= 4) {
+            symbol = EKG_SYMBOLS.MISSING_3_4;
+            color = EKG_COLORS.MISSING_LATE;
+        } else if (missingCount <= 6) {
+            symbol = EKG_SYMBOLS.MISSING_5_6;
+            color = EKG_COLORS.MISSING_LATE;
+        } else {
+            symbol = EKG_SYMBOLS.GONE;
+            color = EKG_COLORS.GONE;
+        }
+    } else if (type === 'gone') {
+        symbol = EKG_SYMBOLS.GONE;
+        color = EKG_COLORS.GONE;
+    }
+    
+    // Add to history
+    shipEKG[shipName].push({
+        symbol: symbol,
+        color: color,
+        timestamp: timestamp,
+        type: type,
+        missingCount: missingCount
+    });
+    
+    // Keep max 100 entries
+    if (shipEKG[shipName].length > 100) {
+        shipEKG[shipName].shift();
+    }
+    
+    updateEKGDisplay(shipName);
+}
+
+/**
+ * Update EKG display for a ship
+ */
+function updateEKGDisplay(shipName) {
+    const ekgId = shipName === 'Cygnus' ? 'cygnus-ekg' : 'orion-ekg';
+    let ekgElem = document.getElementById(ekgId);
+    
+    if (!ekgElem) return;
+    
+    // Build EKG string (show last 28 signals to fill width)
+    const maxWidth = 28;
+    const history = shipEKG[shipName];
+    const now = Date.now();
+    let ekgHTML = '';
+    
+    // Get last maxWidth entries or fill with empty
+    for (let i = 0; i < maxWidth; i++) {
+        const index = history.length - maxWidth + i;
+        
+        if (index < 0 || index >= history.length) {
+            // Fill with filler
+            ekgHTML += `<span style="color: ${EKG_COLORS.FILLER}">${EKG_SYMBOLS.FILLER}</span>`;
+        } else {
+            const entry = history[index];
+            // Just use the symbol and color, no special handling for old entries
+            ekgHTML += `<span style="color: ${entry.color}">${entry.symbol}</span>`;
+        }
+    }
+    
+    ekgElem.innerHTML = ekgHTML;
+}
+
+// Export for use in test panel
+window.addToEKG = addToEKG;
+
+// Update EKG displays periodically
+setInterval(() => {
+    updateEKGDisplay('Cygnus');
+    updateEKGDisplay('The Orion');
+}, 1000);

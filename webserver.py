@@ -40,6 +40,10 @@ class WebServer:
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_get('/status', self.status_handler)
         self.app.router.add_get('/favicon.ico', self.favicon_handler)
+        self.app.router.add_get('/service-worker.js', self.service_worker_handler)
+        self.app.router.add_get('/vapid-public-key', self.vapid_key_handler)
+        self.app.router.add_post('/subscribe', self.subscribe_handler)
+        self.app.router.add_post('/unsubscribe', self.unsubscribe_handler)
         
         # Setup CSS directory
         css_dir = Path(__file__).parent / 'css'
@@ -87,9 +91,14 @@ class WebServer:
         """Return current status as JSON"""
         if self.listener:
             status = self.listener.get_status()
+            # Add test mode flag
+            status['test_mode'] = os.environ.get('TEST_MODE', '').upper() == 'TRUE'
             return web.json_response(status)
         else:
-            return web.json_response({"error": "Listener not available"})
+            return web.json_response({
+                "error": "Listener not available",
+                "test_mode": os.environ.get('TEST_MODE', '').upper() == 'TRUE'
+            })
     
     async def favicon_handler(self, request):
         """Serve favicon"""
@@ -98,6 +107,86 @@ class WebServer:
             return web.FileResponse(favicon_path)
         else:
             return web.Response(status=404)
+    
+    async def service_worker_handler(self, request):
+        """Serve service worker"""
+        sw_path = Path(__file__).parent / 'service-worker.js'
+        if sw_path.exists():
+            return web.FileResponse(sw_path, headers={
+                'Content-Type': 'application/javascript',
+                'Service-Worker-Allowed': '/'
+            })
+        else:
+            return web.Response(status=404)
+    
+    async def vapid_key_handler(self, request):
+        """Return VAPID public key for push subscriptions"""
+        public_key = os.environ.get('VAPID_PUBLIC_KEY', '')
+        if public_key:
+            logger.debug(f"Serving VAPID public key: {public_key[:20]}...")
+        return web.json_response({'public_key': public_key})
+    
+    async def subscribe_handler(self, request):
+        """Handle push notification subscription"""
+        try:
+            data = await request.json()
+            
+            # Check if database is available
+            if not os.environ.get('MEGASHIPDB'):
+                return web.json_response({'success': False, 'error': 'Push notifications not configured'}, status=503)
+            
+            # Import database handler
+            from utils.database import db
+            
+            # Initialize if not already done
+            if not db.pool:
+                await db.init_db()
+            
+            # Save subscription
+            success = await db.save_subscription(data)
+            
+            if success:
+                logger.info(f"✓ New push subscription saved")
+                return web.json_response({'success': True})
+            else:
+                return web.json_response({'success': False, 'error': 'Failed to save subscription'}, status=500)
+                
+        except Exception as e:
+            logger.error(f"Subscribe error: {e}")
+            return web.json_response({'success': False, 'error': str(e)}, status=500)
+    
+    async def unsubscribe_handler(self, request):
+        """Handle push notification unsubscription"""
+        try:
+            data = await request.json()
+            endpoint = data.get('endpoint')
+            
+            if not endpoint:
+                return web.json_response({'success': False, 'error': 'Endpoint required'}, status=400)
+            
+            # Check if database is available
+            if not os.environ.get('MEGASHIPDB'):
+                return web.json_response({'success': False, 'error': 'Push notifications not configured'}, status=503)
+            
+            # Import database handler
+            from utils.database import db
+            
+            # Initialize if not already done
+            if not db.pool:
+                await db.init_db()
+            
+            # Remove subscription
+            success = await db.remove_subscription(endpoint)
+            
+            if success:
+                logger.info(f"✓ Push subscription removed")
+                return web.json_response({'success': True})
+            else:
+                return web.json_response({'success': False, 'error': 'Failed to remove subscription'}, status=500)
+                
+        except Exception as e:
+            logger.error(f"Unsubscribe error: {e}")
+            return web.json_response({'success': False, 'error': str(e)}, status=500)
             
     async def websocket_handler(self, request):
         """Handle WebSocket connections"""
@@ -126,6 +215,24 @@ class WebServer:
                     if data.get("type") == "ping":
                         await ws.send_json({"type": "pong"})
                         logger.debug("Ping/pong exchange")
+                    elif data.get("type") == "send_push":
+                        # Client is triggering a push notification (for testing)
+                        notification = data.get("notification", {})
+                        ship = notification.get("ship")
+                        system = notification.get("system")
+                        event_type = notification.get("event_type")
+                        
+                        logger.info(f"📱 Push notification triggered from client: {event_type} for {ship}")
+                        
+                        # Send the ACTUAL push notification via pywebpush
+                        try:
+                            from utils.push_notifications import send_ship_jumped, send_ship_appeared
+                            if event_type == "jumped":
+                                await send_ship_jumped(ship, system)
+                            elif event_type == "appeared":
+                                await send_ship_appeared(ship, system)
+                        except Exception as e:
+                            logger.error(f"Failed to send push: {e}")
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     logger.error(f'WebSocket error: {ws.exception()}')
                     

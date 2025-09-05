@@ -136,6 +136,17 @@ window.updateMegashipMap = function(shipName, system, detected) {
     if (shipPositions[shipName] && shipPositions[shipName] !== markerId) {
         console.log(`Hiding previous position: ${shipPositions[shipName]}`);
         hideElement(shipPositions[shipName]);
+        
+        // Reset the old system marker to default orange color
+        const oldSystemId = shipPositions[shipName].replace('a', '').replace('b', ''); // Remove a/b suffix
+        const oldSystemMarker = document.getElementById(`M${oldSystemId}`);
+        if (oldSystemMarker) {
+            const paths = oldSystemMarker.querySelectorAll('path, circle');
+            paths.forEach(path => {
+                path.style.fill = '#FF8C00';  // Orange (default)
+                path.style.stroke = '#FF8C00';
+            });
+        }
     }
     
     // Update ship position

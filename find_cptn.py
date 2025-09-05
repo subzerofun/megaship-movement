@@ -34,12 +34,43 @@ class MegashipTracker:
         logger.info("  Tracking: Cygnus and The Orion")
         logger.info("=" * 60)
         
+        # Check VAPID keys
+        import os
+        vapid_public = os.environ.get('VAPID_PUBLIC_KEY')
+        vapid_private = os.environ.get('VAPID_PRIVATE_KEY')
+        
+        if vapid_public and vapid_private:
+            # Violet/Magenta color
+            logger.info("\033[95m🔑 VAPID keys detected - Push notifications available\033[0m")
+            logger.info(f"\033[95m   Public key: {vapid_public[:20]}...\033[0m")
+        else:
+            logger.warning("\033[93m⚠ VAPID keys not found - Push notifications disabled\033[0m")
+            if not vapid_public:
+                logger.warning("   Missing: VAPID_PUBLIC_KEY")
+            if not vapid_private:
+                logger.warning("   Missing: VAPID_PRIVATE_KEY")
+        
+        # Initialize push notification system if database is configured
+        try:
+            from utils.push_notifications import init_push_notifications
+            push_enabled = await init_push_notifications()
+            if push_enabled:
+                logger.info("Push notification system enabled")
+            else:
+                logger.info("Push notifications disabled")
+        except Exception as e:
+            logger.warning(f"Push notifications disabled: {e}")
+        
         # Create EDDN listener
         self.listener = EDDNListener()
         
         # Create web server - use 8000 for server, 8042 for local
         port = 8000 if is_server else 8042
         self.server = WebServer(listener=self.listener, port=port)
+        
+        # Check for --test argument
+        if '--test' in sys.argv:
+            logger.info("Test mode enabled - visit http://localhost:{}/index.html?test to see test panel".format(port))
         self.server.set_listener(self.listener)
         
         # Start web server
@@ -59,20 +90,37 @@ class MegashipTracker:
         except asyncio.CancelledError:
             logger.info("Shutting down...")
             
-    def stop(self):
+    async def stop(self):
         """Stop the tracker"""
         self.running = False
         if self.listener:
             self.listener.stop()
+        
+        # Close push notification database if initialized
+        try:
+            from utils.push_notifications import close
+            await close()
+        except:
+            pass
 
 async def main():
     """Main entry point"""
+    # Check for --db argument and set as environment variable for webserver
+    # Also check for --test argument
+    test_mode = False
+    for i, arg in enumerate(sys.argv):
+        if arg == '--db' and i + 1 < len(sys.argv):
+            os.environ['MEGASHIPDB'] = sys.argv[i + 1]
+        elif arg == '--test':
+            test_mode = True
+            os.environ['TEST_MODE'] = 'true'
+    
     tracker = MegashipTracker()
     
     # Setup signal handlers for graceful shutdown
     def signal_handler(sig, frame):
         logger.info("\nReceived interrupt signal, shutting down...")
-        tracker.stop()
+        asyncio.create_task(tracker.stop())
         sys.exit(0)
         
     signal.signal(signal.SIGINT, signal_handler)
