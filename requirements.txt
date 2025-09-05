@@ -1,3 +1,4 @@
 pyzmq>=25.0.0
 aiohttp>=3.9.0
 msgspec>=0.18.0
+websockets>=11.0
