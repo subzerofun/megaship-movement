@@ -311,6 +311,11 @@ function connectWebSocket() {
                         
                         console.log(`⚠️ ${shipName} SIGNAL MISSING in ${system} (count: ${missingSignalCounts[shipName][key]})`);
                         
+                        // Trigger map animation for missing signal (only on first missing, not every time)
+                        if (missingSignalCounts[shipName][key] === 1 && window.animateSignalMissing) {
+                            window.animateSignalMissing(system);
+                        }
+                        
                         // After 6 missing signals, the ship has jumped!
                         if (missingSignalCounts[shipName][key] >= 6) {
                             // Change status to MISSING (ship has jumped)
@@ -330,6 +335,11 @@ function connectWebSocket() {
                         // Reset count when detected - this is the ONLY way to reset from MISSING
                         missingSignalCounts[shipName][key] = 0;
                         
+                        // Trigger map animation for detection
+                        if (window.animateShipDetected) {
+                            window.animateShipDetected(system);
+                        }
+                        
                         // Check if ship was MISSING for over 10 minutes (even in same system)
                         const wasLongMissing = shipMissingTimestamps[shipName] && 
                                               (Date.now() - shipMissingTimestamps[shipName]) > (10 * 60 * 1000); // 10 minutes
@@ -347,7 +357,7 @@ function connectWebSocket() {
                             sendPushNotification('appeared', shipName, system, previousSystem);
                             
                             // Clear old system display in table
-                            const oldSystemElem = document.getElementById(previousSystem + '-' + shipNameShort);
+                            const oldSystemElem = document.getElementById(previousSystem + '-' + shipName);
                             if (oldSystemElem) {
                                 oldSystemElem.textContent = '-';
                                 oldSystemElem.style.color = '#FF8C00'; // Orange for old
@@ -377,29 +387,33 @@ function connectWebSocket() {
                     // Update system table immediately
                     const systemName = eventData.system;
                     const shipNameShort = eventData.name.replace('The ', '');
-                    const systemElem = document.getElementById(systemName + '-' + shipNameShort);
+                    // Try both full name and short name for element ID
+                    let systemElem = document.getElementById(systemName + '-' + eventData.name);
+                    if (!systemElem) {
+                        systemElem = document.getElementById(systemName + '-' + shipNameShort);
+                    }
                     if (systemElem) {
                         if (eventData.status === 'DETECTED') {
                             const date = new Date(eventData.timestamp);
                             systemElem.textContent = date.toLocaleTimeString();
                             systemElem.style.color = '#00FF00';
-                            // Update map
+                            // Update map - use the full original name
                             if (window.updateMegashipMap) {
-                                window.updateMegashipMap(shipNameShort.includes('Orion') ? 'The Orion' : shipNameShort, systemName, true);
+                                window.updateMegashipMap(eventData.name, systemName, true);
                             }
                         } else if (eventData.status === 'MISSING') {
                             systemElem.textContent = 'MISSING';
                             systemElem.style.color = '#FF0000';  // Red for jumped
-                            // Update map
+                            // Update map - use the full original name
                             if (window.updateMegashipMap) {
-                                window.updateMegashipMap(shipNameShort.includes('Orion') ? 'The Orion' : shipNameShort, systemName, false);
+                                window.updateMegashipMap(eventData.name, systemName, false);
                             }
                         } else if (eventData.status === 'SIGNAL MISSING') {
                             systemElem.textContent = 'SIGNAL MISSING';
                             systemElem.style.color = '#FFD700';  // Yellow for checking
-                            // Update map
+                            // Update map - use the full original name
                             if (window.updateMegashipMap) {
-                                window.updateMegashipMap(shipNameShort.includes('Orion') ? 'The Orion' : shipNameShort, systemName, false);
+                                window.updateMegashipMap(eventData.name, systemName, false);
                             }
                         }
                     }
@@ -410,6 +424,12 @@ function connectWebSocket() {
                     if (elem) {
                         elem.textContent = eventData.commander_count;
                     }
+                    
+                    // Trigger map animation for commander entering system
+                    if (eventData.action === 'entered' && window.animateCommanderEntry) {
+                        window.animateCommanderEntry(eventData.system);
+                    }
+                    
                     addEventToLog(eventData);
                 }
             }

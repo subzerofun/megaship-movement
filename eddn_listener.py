@@ -147,6 +147,19 @@ class EDDNListener:
         if not system or not system_address:
             return
             
+        # Check if timestamp is within 10 minutes of current time
+        try:
+            msg_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            current_time = datetime.now(timezone.utc)
+            time_diff = abs((current_time - msg_time).total_seconds())
+            
+            if time_diff > 600:  # 10 minutes = 600 seconds
+                logger.debug(f"Ignoring old message from {timestamp} (diff: {time_diff:.0f}s)")
+                return
+        except Exception as e:
+            logger.warning(f"Could not parse timestamp {timestamp}: {e}")
+            return
+            
         # Process signals array
         signals = msg.get("signals", [])
         if not signals:
@@ -265,8 +278,7 @@ class EDDNListener:
                                 try:
                                     from utils.push_notifications import send_ship_jumped
                                     asyncio.create_task(send_ship_jumped(megaship_name, system, timestamp))
-                                    # Update last known system for jump detection
-                                    self.previous_ship_systems[megaship_name] = system
+                                    # DO NOT update previous_ship_systems here - keep the last DETECTED location
                                 except Exception as e:
                                     logger.debug(f"Push notification skipped: {e}")
                             

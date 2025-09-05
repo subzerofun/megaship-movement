@@ -104,6 +104,25 @@ function createTestPanel() {
             </select>
             <button onclick="simulateDetected('The Orion')">Simulate Detected</button>
         </div>
+        
+        <div class="test-section">
+            <h4>Map Animations</h4>
+            <select id="animation-system">
+                <option value="">Select System</option>
+                <option value="Nukamba">Nukamba</option>
+                <option value="Graffias">Graffias</option>
+                <option value="Vodyakamana">Vodyakamana</option>
+                <option value="Marfic">Marfic</option>
+                <option value="Upaniklis">Upaniklis</option>
+                <option value="HR 6524">HR 6524</option>
+                <option value="Col 359 Sector AE-N b9-4">Col 359 Sector AE-N b9-4</option>
+                <option value="HIP 87621">HIP 87621</option>
+            </select>
+            <br>
+            <button onclick="testMapAnimation('COMMANDER')">Test CMDR Entry</button>
+            <button onclick="testMapAnimation('DETECTED')">Test Ship Detected</button>
+            <button onclick="testMapAnimation('MISSING')">Test Signal Missing</button>
+        </div>
     `;
     
     // Insert after map container within the flex container
@@ -242,3 +261,27 @@ window.toggleEDDNTracking = toggleEDDNTracking;
 window.simulateMissingSignal = simulateMissingSignal;
 window.simulateMissingStatus = simulateMissingStatus;
 window.simulateDetected = simulateDetected;
+
+/**
+ * Test map animations directly
+ */
+window.testMapAnimation = function(animationType) {
+    const systemSelect = document.getElementById('animation-system');
+    const system = systemSelect ? systemSelect.value : '';
+    
+    if (!system) {
+        alert('Please select a system for the animation');
+        return;
+    }
+    
+    console.log(`Testing ${animationType} animation for ${system}`);
+    
+    // Call the appropriate animation function
+    if (animationType === 'COMMANDER' && window.animateCommanderEntry) {
+        window.animateCommanderEntry(system);
+    } else if (animationType === 'DETECTED' && window.animateShipDetected) {
+        window.animateShipDetected(system);
+    } else if (animationType === 'MISSING' && window.animateSignalMissing) {
+        window.animateSignalMissing(system);
+    }
+};

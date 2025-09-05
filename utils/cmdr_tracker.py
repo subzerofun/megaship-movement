@@ -25,9 +25,22 @@ class CommanderTracker:
         """
         system_name = msg.get("StarSystem")
         system_address = msg.get("SystemAddress")
-        timestamp = msg.get("timestamp")
+        timestamp = msg.get("timestamp", datetime.now(timezone.utc).isoformat())
         
         if not system_name or not system_address or not cmdr_id:
+            return
+            
+        # Check if timestamp is within 10 minutes of current time
+        try:
+            msg_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            current_time = datetime.now(timezone.utc)
+            time_diff = abs((current_time - msg_time).total_seconds())
+            
+            if time_diff > 600:  # 10 minutes = 600 seconds
+                logger.debug(f"Ignoring old FSDJump from {timestamp} (diff: {time_diff:.0f}s)")
+                return
+        except Exception as e:
+            logger.warning(f"Could not parse timestamp {timestamp}: {e}")
             return
             
         # Check if commander was previously in a tracked system

@@ -3,23 +3,53 @@
  * Controls visibility of ship markers on the SVG map
  */
 
-// System mapping - maps system names to marker IDs (8 systems total)
+// System mapping - maps system names to data-name attributes and current IDs
+// The data-name attributes (M1-M8, C1-C8, O1-O8) are stable across SVG saves
+// The IDs may change when the SVG is re-saved in Illustrator
 const SYSTEM_MAP = {
-    'Nukamba': { index: 1, marker: 'i', cygnus: 'r', orion: 'u' },      // M1 -> C1, O1
-    'Graffias': { index: 2, marker: 'd', cygnus: 'aa', orion: 'q' },    // M2 -> C2, O2
-    'Vodyakamana': { index: 3, marker: 'g', cygnus: 'm', orion: 'n' },  // M3 -> C3, O3
-    'Marfic': { index: 4, marker: 'h', cygnus: 'z', orion: 'o' },       // M4 -> C4, O4
-    'Upaniklis': { index: 5, marker: 'f', cygnus: 'ab', orion: 'p' },   // M5 -> C5, O5
-    'HR 6524': { index: 6, marker: 'e', cygnus: 's', orion: 't' },      // M6 -> C6, O6
-    'Col 359 Sector AE-N b9-4': { index: 7, marker: 'j', cygnus: 'v', orion: 'x' }, // M7 -> C7, O7
-    'HIP 87621': { index: 8, marker: 'k', cygnus: 'w', orion: 'y' }     // M8 -> C8, O8 (permit locked)
+    'Nukamba': { index: 1, marker: 'i', cygnus: 'r', orion: 'u', dataName: 'M1', cygnusDataName: 'C1', orionDataName: 'O1' },
+    'Graffias': { index: 2, marker: 'd', cygnus: 'aa', orion: 'q', dataName: 'M2', cygnusDataName: 'C2', orionDataName: 'O2' },
+    'Vodyakamana': { index: 3, marker: 'g', cygnus: 'm', orion: 'n', dataName: 'M3', cygnusDataName: 'C3', orionDataName: 'O3' },
+    'Marfic': { index: 4, marker: 'h', cygnus: 'z', orion: 'o', dataName: 'M4', cygnusDataName: 'C4', orionDataName: 'O4' },
+    'Upaniklis': { index: 5, marker: 'f', cygnus: 'ab', orion: 'p', dataName: 'M5', cygnusDataName: 'C5', orionDataName: 'O5' },
+    'HR 6524': { index: 6, marker: 'e', cygnus: 's', orion: 't', dataName: 'M6', cygnusDataName: 'C6', orionDataName: 'O6' },
+    'Col 359 Sector AE-N b9-4': { index: 7, marker: 'j', cygnus: 'v', orion: 'x', dataName: 'M7', cygnusDataName: 'C7', orionDataName: 'O7' },
+    'HIP 87621': { index: 8, marker: 'k', cygnus: 'w', orion: 'y', dataName: 'M8', cygnusDataName: 'C8', orionDataName: 'O8' }
 };
 
-// Track current ship positions
+// Track current ship positions (store system name, not marker ID)
 const shipPositions = {
     'Cygnus': null,
     'The Orion': null
 };
+
+/**
+ * Find element by data-name attribute
+ */
+function findByDataName(dataName) {
+    const svg = document.querySelector('#megaship-svg-container svg');
+    if (!svg) return null;
+    
+    const elem = svg.querySelector(`[data-name="${dataName}"]`);
+    if (elem) {
+        console.log(`Found element with data-name="${dataName}"`);
+    }
+    return elem;
+}
+
+/**
+ * Get element by ID with data-name fallback
+ */
+function getElementSafe(elementId, dataName) {
+    let elem = document.getElementById(elementId);
+    if (!elem && dataName) {
+        elem = findByDataName(dataName);
+        if (elem) {
+            console.log(`Using data-name="${dataName}" instead of id="${elementId}"`);
+        }
+    }
+    return elem;
+}
 
 /**
  * Load the SVG map into the container
@@ -66,13 +96,13 @@ function initializeMap() {
         hideAllShipMarkers();
         
         // System markers should already be visible in the SVG
-        // Just verify they exist
-        Object.values(SYSTEM_MAP).forEach(system => {
-            const elem = document.getElementById(system.marker);
+        // Just verify they exist using ID or data-name
+        Object.entries(SYSTEM_MAP).forEach(([systemName, system]) => {
+            const elem = getElementSafe(system.marker, system.dataName);
             if (elem) {
-                console.log(`System marker ${system.marker} found`);
+                console.log(`System marker for ${systemName} found (${system.dataName})`);
             } else {
-                console.error(`System marker ${system.marker} NOT found!`);
+                console.error(`System marker for ${systemName} NOT found! (tried id="${system.marker}" and data-name="${system.dataName}")`);
             }
         });
         
@@ -118,45 +148,54 @@ window.updateMegashipMap = function(shipName, system, detected) {
     
     const systemInfo = SYSTEM_MAP[system];
     let markerId = null;
+    let dataName = null;
     
-    if (shipName === 'Cygnus' && systemInfo.cygnus) {
+    if (shipName === 'Cygnus') {
         markerId = systemInfo.cygnus;
-    } else if (shipName === 'The Orion' && systemInfo.orion) {
+        dataName = systemInfo.cygnusDataName;
+    } else if (shipName === 'The Orion') {
         markerId = systemInfo.orion;
+        dataName = systemInfo.orionDataName;
     }
     
-    if (!markerId) {
-        console.log(`No marker ID for ${shipName} in ${system}`);
+    if (!markerId && !dataName) {
+        console.log(`No marker mapping for ${shipName} in ${system}`);
         return;
     }
     
-    console.log(`Marker ID: ${markerId}, detected: ${detected}`);
+    console.log(`Looking for ${shipName} marker: id="${markerId}" or data-name="${dataName}", detected: ${detected}`);
     
-    // Hide previous position if it's different
-    if (shipPositions[shipName] && shipPositions[shipName] !== markerId) {
+    // Hide previous position if it's different system
+    if (shipPositions[shipName] && shipPositions[shipName] !== system) {
         console.log(`Hiding previous position: ${shipPositions[shipName]}`);
-        hideElement(shipPositions[shipName]);
+        // Get the previous system's info
+        const prevSystemInfo = SYSTEM_MAP[shipPositions[shipName]];
+        if (prevSystemInfo) {
+            const prevMarkerId = shipName === 'Cygnus' ? prevSystemInfo.cygnus : prevSystemInfo.orion;
+            const prevDataName = shipName === 'Cygnus' ? prevSystemInfo.cygnusDataName : prevSystemInfo.orionDataName;
+            hideElement(prevMarkerId, prevDataName);
         
-        // Reset the old system marker to default orange color
-        const oldSystemId = shipPositions[shipName].replace('a', '').replace('b', ''); // Remove a/b suffix
-        const oldSystemMarker = document.getElementById(`M${oldSystemId}`);
-        if (oldSystemMarker) {
-            const paths = oldSystemMarker.querySelectorAll('path, circle');
-            paths.forEach(path => {
-                path.style.fill = '#FF8C00';  // Orange (default)
-                path.style.stroke = '#FF8C00';
-            });
+            // Reset the old system marker to orange
+            const oldSystemMarker = getElementSafe(prevSystemInfo.marker, prevSystemInfo.dataName);
+            if (oldSystemMarker) {
+                console.log(`Resetting ${prevSystemInfo.marker} to orange`);
+                const paths = oldSystemMarker.querySelectorAll('path, circle');
+                paths.forEach(path => {
+                    path.style.fill = '#FF8C00';  // Orange (default)
+                    path.style.stroke = '#FF8C00';
+                });
+            }
         }
     }
     
     // Update ship position
     if (detected) {
-        console.log(`Showing ${markerId} for ${shipName}`);
-        showElement(markerId);
-        shipPositions[shipName] = markerId;
+        console.log(`Showing marker for ${shipName}`);
+        showElement(markerId, dataName);
+        shipPositions[shipName] = system;  // Store system name, not marker ID
         
         // Also highlight the system marker (M1-M8) in green for Cygnus, cyan for Orion
-        const systemMarker = document.getElementById(systemInfo.marker);
+        const systemMarker = getElementSafe(systemInfo.marker, systemInfo.dataName);
         if (systemMarker) {
             // Find all path and circle elements within the marker group
             const paths = systemMarker.querySelectorAll('path, circle');
@@ -171,14 +210,14 @@ window.updateMegashipMap = function(shipName, system, detected) {
             });
         }
     } else {
-        console.log(`Hiding ${markerId} for ${shipName}`);
-        hideElement(markerId);
-        if (shipPositions[shipName] === markerId) {
+        console.log(`Hiding marker for ${shipName}`);
+        hideElement(markerId, dataName);
+        if (shipPositions[shipName] === system) {
             shipPositions[shipName] = null;
         }
         
-        // Reset system marker color if no ships detected there
-        const systemMarker = document.getElementById(systemInfo.marker);
+        // Reset system marker color to orange when ship is not detected
+        const systemMarker = getElementSafe(systemInfo.marker, systemInfo.dataName);
         if (systemMarker) {
             // Check if other ship is also not there
             let otherShipDetected = false;
@@ -192,8 +231,8 @@ window.updateMegashipMap = function(shipName, system, detected) {
                 // Reset to orange
                 const paths = systemMarker.querySelectorAll('path, circle');
                 paths.forEach(path => {
-                    path.style.fill = '';  // Reset to original
-                    path.style.stroke = '';
+                    path.style.fill = '#FF8C00';  // Orange (default)
+                    path.style.stroke = '#FF8C00';
                 });
             }
         }
@@ -204,48 +243,46 @@ window.updateMegashipMap = function(shipName, system, detected) {
  * Hide all ship markers (C1-C8, O1-O8)
  */
 function hideAllShipMarkers() {
-    // Hide all Cygnus markers (C1-C8)
-    const cygnusMarkers = ['r', 'aa', 'm', 'z', 'ab', 's', 'v', 'w'];
-    cygnusMarkers.forEach(id => hideElement(id));
-    
-    // Hide all Orion markers (O1-O8)
-    const orionMarkers = ['u', 'q', 'n', 'o', 'p', 't', 'x', 'y'];
-    orionMarkers.forEach(id => hideElement(id));
+    // Hide all Cygnus markers (C1-C8) - use both ID and data-name
+    Object.values(SYSTEM_MAP).forEach(system => {
+        hideElement(system.cygnus, system.cygnusDataName);
+        hideElement(system.orion, system.orionDataName);
+    });
 }
 
 /**
- * Show an SVG element by ID
+ * Show an SVG element by ID or data-name
  */
-function showElement(elementId) {
-    const element = document.getElementById(elementId);
+function showElement(elementId, dataName) {
+    const element = getElementSafe(elementId, dataName);
     if (element) {
-        console.log(`Actually showing element ${elementId}`);
+        console.log(`Showing element (id="${elementId}" or data-name="${dataName}")`);
         element.style.display = '';  // Use empty string for SVG elements
         element.style.visibility = 'visible';
         element.style.opacity = '1';
         // For SVG groups, also check if it has a parent g element
-        if (element.tagName === 'g') {
+        if (element.tagName === 'g' || element.tagName === 'G') {
             element.setAttribute('display', 'inline');
         }
     } else {
-        console.error(`Element ${elementId} not found in SVG`);
+        console.error(`Element not found (tried id="${elementId}" and data-name="${dataName}")`);
     }
 }
 
 /**
- * Hide an SVG element by ID
+ * Hide an SVG element by ID or data-name
  */
-function hideElement(elementId) {
-    const element = document.getElementById(elementId);
+function hideElement(elementId, dataName) {
+    const element = getElementSafe(elementId, dataName);
     if (element) {
-        console.log(`Actually hiding element ${elementId}`);
+        console.log(`Hiding element (id="${elementId}" or data-name="${dataName}")`);
         element.style.display = 'none';
         // For SVG groups, also use attribute
-        if (element.tagName === 'g') {
+        if (element.tagName === 'g' || element.tagName === 'G') {
             element.setAttribute('display', 'none');
         }
     } else {
-        console.error(`Element ${elementId} not found in SVG`);
+        console.error(`Element not found (tried id="${elementId}" and data-name="${dataName}")`);
     }
 }
 
