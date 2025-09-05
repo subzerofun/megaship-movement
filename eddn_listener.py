@@ -241,21 +241,21 @@ class EDDNListener:
                             
                             # Update tracked system
                             self.tracked_systems[system][megaship_name] = "SIGNAL MISSING"
+                            
+                            # Create event ONLY after 5 confirmations
+                            event_data = {
+                                "type": "megaship",
+                                "name": megaship_name,
+                                "system": system,
+                                "system_address": system_address,
+                                "status": "SIGNAL MISSING",
+                                "timestamp": timestamp,
+                                "previous_detection": current_status_in_system
+                            }
+                            await self.handle_event(event_data)
                         else:
                             logger.debug(f"Missing confirmation #{self.missing_confirmations[key]} for {megaship_name} in {system}")
                             # Keep showing last detected time until 5 confirmations
-                        
-                        # Create event
-                        event_data = {
-                            "type": "megaship",
-                            "name": megaship_name,
-                            "system": system,
-                            "system_address": system_address,
-                            "status": "SIGNAL MISSING",
-                            "timestamp": timestamp,
-                            "previous_detection": current_status_in_system
-                        }
-                        await self.handle_event(event_data)
                     # else: Keep current status (NOT DETECTED or existing status)
         
         # Update fleet carrier count for tracked system
