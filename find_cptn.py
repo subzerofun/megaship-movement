@@ -61,17 +61,19 @@ class MegashipTracker:
         except Exception as e:
             logger.warning(f"Push notifications disabled: {e}")
         
-        # Create EDDN listener
-        self.listener = EDDNListener()
-        
-        # Create web server - use 8000 for server, 8042 for local
+        # Create web server first - use 8000 for server, 8042 for local
         port = 8000 if is_server else 8042
-        self.server = WebServer(listener=self.listener, port=port)
+        self.server = WebServer(listener=None, port=port)
+        
+        # Create EDDN listener with webserver's broadcast as callback
+        self.listener = EDDNListener(callback=self.server.broadcast_event)
+        
+        # Set listener in server
+        self.server.listener = self.listener
         
         # Check for --test argument
         if '--test' in sys.argv:
             logger.info("Test mode enabled - visit http://localhost:{}/index.html?test to see test panel".format(port))
-        self.server.set_listener(self.listener)
         
         # Start web server
         await self.server.start()

@@ -166,23 +166,23 @@ function addEventToLog(event) {
                 break;
             case 'departed':
                 icon = '↩';
-                message = `CMDR departed ${event.system} (now ${event.commander_count} CMDRs)`;
+                message = `CMDR departed ${event.system} (now ${event.commander_count || 0} CMDRs)`;
                 break;
             case 'arrived':
                 icon = '↪';
-                message = `CMDR arrived in ${event.system} (now ${event.commander_count} CMDRs)`;
+                message = `CMDR arrived in ${event.system} (now ${event.commander_count || 0} CMDRs)`;
                 break;
             case 'arrived_planned':
                 icon = '↪';
-                message = `CMDR arrived in ${event.system} as planned (now ${event.commander_count} CMDRs)`;
+                message = `CMDR arrived in ${event.system} as planned (now ${event.commander_count || 0} CMDRs)`;
                 break;
             case 'entered':  // Legacy support
                 icon = '↪';
-                message = `Commander entered ${event.system} (now ${event.commander_count} cmdrs)`;
+                message = `Commander entered ${event.system} (now ${event.commander_count || 0} cmdrs)`;
                 break;
             case 'left':  // Legacy support
                 icon = '↩';
-                message = `Commander left ${event.system} (now ${event.commander_count} cmdrs)`;
+                message = `Commander left ${event.system} (now ${event.commander_count || 0} cmdrs)`;
                 break;
             default:
                 icon = '↪';
@@ -260,7 +260,7 @@ function connectWebSocket() {
                         // Update commander count
                         const countElem = document.getElementById(system + '-count');
                         if (countElem) {
-                            countElem.textContent = data.commanders;
+                            countElem.textContent = data.commanders || 0;
                         }
                         
                         // Update FC count
@@ -467,15 +467,19 @@ function connectWebSocket() {
                     if (eventData.commander_count !== undefined) {
                         const elem = document.getElementById(eventData.system + '-count');
                         if (elem) {
-                            elem.textContent = eventData.commander_count;
+                            elem.textContent = eventData.commander_count || 0;
                         }
                     }
                     
                     // Trigger map animations based on action
+                    console.log('System traffic event:', eventData.action, eventData.system);
                     if (window.animateCommanderEntry) {
                         if (eventData.action === 'arrived' || eventData.action === 'arrived_planned' || eventData.action === 'entered') {
+                            console.log('Triggering commander animation for:', eventData.system);
                             window.animateCommanderEntry(eventData.system);
                         }
+                    } else {
+                        console.log('animateCommanderEntry not found!');
                     }
                     
                     addEventToLog(eventData);

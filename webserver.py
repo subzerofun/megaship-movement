@@ -79,6 +79,23 @@ class WebServer:
         else:
             logger.warning(f"Image directory not found at {img_dir}")
         
+    async def broadcast_event(self, event_data):
+        """Broadcast event to all connected WebSocket clients"""
+        if self.websockets:
+            message = json.dumps({
+                "type": "event",
+                "data": event_data
+            })
+            # Send to all connected clients
+            disconnected = set()
+            for ws in self.websockets:
+                try:
+                    await ws.send_str(message)
+                except ConnectionResetError:
+                    disconnected.add(ws)
+            # Remove disconnected clients
+            self.websockets -= disconnected
+    
     async def index_handler(self, request):
         """Serve main HTML page"""
         html_path = Path(__file__).parent / 'index.html'
