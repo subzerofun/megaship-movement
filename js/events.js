@@ -5,6 +5,7 @@
 
 let ws = null;
 let reconnectTimer = null;
+let isTestMode = false;
 
 // Track missing signal counts for each ship/system combination
 const missingSignalCounts = {
@@ -146,11 +147,51 @@ function addEventToLog(event) {
             `;
         }
     } else if (event.type === 'system_traffic') {
+        // Hide planned routes unless in test mode
+        if ((event.action === 'planned_departure' || event.action === 'planned_arrival') && !isTestMode) {
+            return;  // Don't display planned routes in production
+        }
+        
         eventDiv.className += ' system';
-        const icon = event.action === 'entered' ? '↪' : '↩';
+        let icon, message;
+        
+        switch(event.action) {
+            case 'planned_departure':
+                icon = '↩📍';
+                message = `CMDR planned NavRoute from ${event.system}`;
+                break;
+            case 'planned_arrival':
+                icon = '↪📍';
+                message = `CMDR planned NavRoute to ${event.system}`;
+                break;
+            case 'departed':
+                icon = '↩';
+                message = `CMDR departed ${event.system} (now ${event.commander_count} CMDRs)`;
+                break;
+            case 'arrived':
+                icon = '↪';
+                message = `CMDR arrived in ${event.system} (now ${event.commander_count} CMDRs)`;
+                break;
+            case 'arrived_planned':
+                icon = '↪';
+                message = `CMDR arrived in ${event.system} as planned (now ${event.commander_count} CMDRs)`;
+                break;
+            case 'entered':  // Legacy support
+                icon = '↪';
+                message = `Commander entered ${event.system} (now ${event.commander_count} cmdrs)`;
+                break;
+            case 'left':  // Legacy support
+                icon = '↩';
+                message = `Commander left ${event.system} (now ${event.commander_count} cmdrs)`;
+                break;
+            default:
+                icon = '↪';
+                message = `${event.action} ${event.system}`;
+        }
+        
         eventDiv.innerHTML = `
-            <strong>${icon} ${event.system}</strong><br>
-            Commander ${event.action} (now ${event.commander_count} cmdrs)
+            <strong>${icon} ${message}</strong><br>
+            ${(isTestMode && event.uploader_id) ? `uploaderID: ${event.uploader_id}` : ''}
             <div class="event-time">${formatTime(event.timestamp)}</div>
         `;
     } else {
@@ -188,6 +229,9 @@ function connectWebSocket() {
             const message = JSON.parse(event.data);
             
             if (message.type === 'initial_status') {
+                // Check test mode status
+                isTestMode = message.data.test_mode || false;
+                
                 // Update megaship status
                 updateMegashipStatus('Cygnus', message.data.megaships.Cygnus);
                 updateMegashipStatus('The Orion', message.data.megaships['The Orion']);
@@ -419,15 +463,19 @@ function connectWebSocket() {
                     }
                     addEventToLog(eventData);
                 } else if (eventData.type === 'system_traffic') {
-                    // Update system commander count
-                    const elem = document.getElementById(eventData.system + '-count');
-                    if (elem) {
-                        elem.textContent = eventData.commander_count;
+                    // Update system commander count for actual movements (not plans)
+                    if (eventData.commander_count !== undefined) {
+                        const elem = document.getElementById(eventData.system + '-count');
+                        if (elem) {
+                            elem.textContent = eventData.commander_count;
+                        }
                     }
                     
-                    // Trigger map animation for commander entering system
-                    if (eventData.action === 'entered' && window.animateCommanderEntry) {
-                        window.animateCommanderEntry(eventData.system);
+                    // Trigger map animations based on action
+                    if (window.animateCommanderEntry) {
+                        if (eventData.action === 'arrived' || eventData.action === 'arrived_planned' || eventData.action === 'entered') {
+                            window.animateCommanderEntry(eventData.system);
+                        }
                     }
                     
                     addEventToLog(eventData);

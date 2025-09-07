@@ -30,14 +30,14 @@ class EDDNListener:
             "The Orion": {"last_seen": None, "system": None, "system_address": None, "status": "NOT DETECTED"}
         }
         self.tracked_systems = {
-            "Nukamba": {"address": 1183095788250, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "Graffias": {"address": 17880842853, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "Vodyakamana": {"address": 0, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "Marfic": {"address": 203174184124, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "Upaniklis": {"address": 13862946481609, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "HR 6524": {"address": 83584193298, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "Col 359 Sector AE-N b9-4": {"address": 9463826621993, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
-            "HIP 87621": {"address": 147882789259, "commanders": set(), "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"}
+            "Nukamba": {"address": 1183095788250, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "Graffias": {"address": 17880842853, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "Vodyakamana": {"address": 0, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "Marfic": {"address": 203174184124, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "Upaniklis": {"address": 13862946481609, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "HR 6524": {"address": 83584193298, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "Col 359 Sector AE-N b9-4": {"address": 9463826621993, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"},
+            "HIP 87621": {"address": 147882789259, "commanders": 0, "jumps_to": 0, "jumps_from": 0, "fleet_carriers": 0, "Cygnus": "NOT DETECTED", "The Orion": "NOT DETECTED"}
         }
         self.cmdr_tracker = CommanderTracker()  # Use the new commander tracker
         self.recent_events = deque(maxlen=300)  # Keep last 300 events
@@ -119,10 +119,9 @@ class EDDNListener:
             if self.messages_processed <= 5:
                 logger.info(f"Processing message #{self.messages_processed}: schema={schema.split('/')[-2] if '/' in schema else schema}")
             
-            # Get commander ID (uploaderID + softwareName)
+            # Get uploader ID (just the uploaderID, not combined with software)
             uploader_id = header.get("uploaderID", "")
             software = header.get("softwareName", "")
-            cmdr_id = f"{uploader_id}_{software}" if uploader_id and software else None
             
             # Process different schemas
             if "fsssignaldiscovered" in schema:
@@ -130,9 +129,9 @@ class EDDNListener:
             elif "journal" in schema:
                 event = msg.get("event")
                 if event == "FSDJump":
-                    await self.process_fsd_jump(msg, cmdr_id)
+                    await self.process_fsd_jump(msg, uploader_id)
             elif "navroute" in schema:
-                await self.process_nav_route(msg, cmdr_id)
+                await self.process_nav_route(msg, uploader_id)
                 
         except Exception as e:
             logger.error(f"Error in process_message: {e}")
@@ -259,19 +258,19 @@ class EDDNListener:
                         
                         self.missing_confirmations[key] += 1
                         
-                        # Only mark as SIGNAL MISSING after configured confirmations
+                        # Update visual status to SIGNAL MISSING after 3 confirmations
+                        if self.missing_confirmations[key] >= 3:
+                            self.megaships[megaship_name]["status"] = "SIGNAL MISSING"
+                            self.tracked_systems[system][megaship_name] = "SIGNAL MISSING"
+                        
+                        # Log and create event after 5 confirmations
                         if self.missing_confirmations[key] >= 5:
                             logger.info(f"⚠️ MEGASHIP SIGNAL MISSING: {megaship_name} confirmed missing in {system} after {self.missing_confirmations[key]} scans")
                             logger.info(f"   Previous detection: {current_status_in_system}")
                             logger.info(f"   Current scan: {len(signals)} signals, none matching {megaship_name}")
                             
-                            # Update status to SIGNAL MISSING
-                            self.megaships[megaship_name]["status"] = "SIGNAL MISSING"
                             self.megaships[megaship_name]["last_checked"] = timestamp
                             self.megaships[megaship_name]["previous_detection"] = current_status_in_system
-                            
-                            # Update tracked system
-                            self.tracked_systems[system][megaship_name] = "SIGNAL MISSING"
                             
                             # Check if this is the jump threshold - send notification
                             if self.missing_confirmations[key] == MISSING_COUNT_FOR_JUMP:
@@ -304,13 +303,13 @@ class EDDNListener:
             if fleet_carrier_count > 0:
                 logger.debug(f"Fleet Carriers in {system}: {fleet_carrier_count}")
     
-    async def process_fsd_jump(self, msg, cmdr_id):
+    async def process_fsd_jump(self, msg, uploader_id):
         """Process FSDJump events - delegate to commander tracker"""
-        await self.cmdr_tracker.process_fsd_jump(msg, cmdr_id, self.tracked_systems, self.handle_event)
+        await self.cmdr_tracker.process_fsd_jump(msg, uploader_id, self.tracked_systems, self.handle_event)
     
-    async def process_nav_route(self, msg, cmdr_id):
+    async def process_nav_route(self, msg, uploader_id):
         """Process NavRoute events - delegate to commander tracker"""
-        await self.cmdr_tracker.process_nav_route(msg, cmdr_id, self.tracked_systems)
+        await self.cmdr_tracker.process_nav_route(msg, uploader_id, self.tracked_systems, self.handle_event)
                 
     async def handle_event(self, event_data):
         """Handle processed event"""
@@ -327,7 +326,7 @@ class EDDNListener:
         system_stats = {}
         for system_name, data in self.tracked_systems.items():
             system_stats[system_name] = {
-                "commanders": len(data["commanders"]),
+                "commanders": data["commanders"],  # Now an integer, not a set
                 "jumps_to": data["jumps_to"],
                 "jumps_from": data["jumps_from"],
                 "fleet_carriers": data["fleet_carriers"],

@@ -200,6 +200,7 @@ class WebServer:
             # Send initial status
             if self.listener:
                 status = self.listener.get_status()
+                status['test_mode'] = os.environ.get('TEST_MODE', '').upper() == 'TRUE'
                 await ws.send_json({
                     "type": "initial_status",
                     "data": status
